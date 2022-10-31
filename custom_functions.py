@@ -1,3 +1,6 @@
+import datetime 
+import matplotlib.pyplot as plt
+
 def delete_additional_header(dataframe):
     ''' 
     If additional headers are present in the dataframe those will be dropped.
@@ -28,3 +31,28 @@ def drop_years(dataframe, years: list):
         dataframe = dataframe.reset_index(drop=True)
     return dataframe
     
+
+def plot_time_series(dataframe, time_range: tuple, y: list, step):
+    if step == 'hour':
+        time = dataframe['timestamp'][dataframe['timestamp'].dt.date == datetime.date(*time_range)]
+        y_feature = [dataframe[feature][dataframe['timestamp'].dt.date == datetime.date(*time_range)] for feature in y]
+    elif step == 'day':
+        year, month = time_range
+        time = dataframe['timestamp'][(dataframe['timestamp'].dt.year == year) & (dataframe['timestamp'].dt.month == month)]
+        y_feature = [dataframe[feature][(dataframe['timestamp'].dt.year == year) & (dataframe['timestamp'].dt.month == month)] for feature in y]
+    elif step == 'month':
+        time = dataframe['timestamp'][dataframe['timestamp'].dt.year == time_range]
+        y_feature = [dataframe[feature][dataframe['timestamp'].dt.year == time_range] for feature in y]
+
+    [plt.plot(time, feature) for feature in y_feature]
+    plt.title(f'Time series of {", ".join(y)} by {step}')
+    plt.xlabel(step)
+    plt.xticks(rotation=90)
+    
+    if len(y) > 1:
+        plt.legend(y)
+        plt.ylabel('y')
+    else:
+        plt.ylabel(", ".join(y))
+
+    plt.show()
