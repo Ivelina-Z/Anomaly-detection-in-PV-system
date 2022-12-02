@@ -1,117 +1,109 @@
 import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, precision_score, recall_score, ConfusionMatrixDisplay
+import numpy as np
 import matplotlib.pyplot as plt
-import datetime 
-from math import ceil
+
+# preprocessing - dataset
 
 
-# DATA CLEANING
-def delete_additional_header(dataframe):
-    ''' 
+def delete_additional_header(data):
+    """
     If additional headers are present in the dataframe those will be dropped.
     The function takes one argument - the dataframe and returns it without the additional records.
-    '''
-    dataframe = dataframe.drop(dataframe[dataframe['SiteID'] == 'SiteID'].index)
-    return dataframe
+
+    :param data: DataFrame
+    :return: DataFrame with only one line of headers.
+    """
+    data = data.drop(data[data['SiteID'] == 'SiteID'].index)
+    return data
 
 
-def convert_data_types(dataframe, columns_type: dict):
+def convert_data_types(data, columns_type):
+    """
+    Converts the datatype of all columns in `columns_type` if it's different.
+    If there's missing data in a column it's converted to float.
+
+    :param data: DataFrame
+    :param columns_type: dictionary with columns' name as key and desired datatype as value
+    :return: DataFrame with converted data types
+    """
     for column, column_type in columns_type.items():
         try:
-            if columns_type[column] != dataframe[column].dtypes:
-                dataframe[column] = dataframe[column].astype(columns_type[column])
-        except ValueError: #raise Error instead except
-            dataframe[column] = dataframe[column].astype(float)
-    return dataframe
+            if columns_type[column] != data[column].dtypes:
+                data[column] = data[column].astype(columns_type[column])
+        except ValueError:
+            data[column] = data[column].astype(float)
+    return data
 
 
 def missing_values_percent(dataframe, year_column):
-    missing_values = dataframe.groupby(dataframe[year_column].dt.year).apply(lambda x: (x.isna().sum() / (x.size / dataframe.shape[1])) * 100)
+    """
+    Calculates the missing values percentage by year for each column in the data.
+
+    :param dataframe: DataFrame
+    :param year_column: the column with year parameter to group by
+    :return: DataFrame with missing values percentage per year
+    """
+    missing_values = dataframe.groupby(dataframe[year_column].dt.year).apply(
+        lambda x: (x.isna().sum() / (x.size / dataframe.shape[1])) * 100)
     return missing_values
 
- 
-def drop_years(dataframe, years: list):
-    for year in years:
-        dataframe = dataframe.drop(dataframe[dataframe['timestamp'].dt.year == year].index)
-        dataframe = dataframe.reset_index(drop=True)
-    return dataframe
-    
 
-# PLOT 
+# preprocessing - pipeline 
 
-def plot_time_series(dataframe, time_range: tuple, y: list, step):
-    if step == 'hour':
-        time = dataframe['timestamp'][dataframe['timestamp'].dt.date == datetime.date(*time_range)]
-        y_feature = [dataframe[feature][dataframe['timestamp'].dt.date == datetime.date(*time_range)] for feature in y]
-    elif step == 'day':
-        year, month = time_range
-        time = dataframe['timestamp'][(dataframe['timestamp'].dt.year == year) & (dataframe['timestamp'].dt.month == month)]
-        y_feature = [dataframe[feature][(dataframe['timestamp'].dt.year == year) & (dataframe['timestamp'].dt.month == month)] for feature in y]
-    elif step == 'month':
-        time = dataframe['timestamp'][dataframe['timestamp'].dt.year == time_range]
-        y_feature = [dataframe[feature][dataframe['timestamp'].dt.year == time_range] for feature in y]
+def encoding_error_code(data):
+    """
+    Encode with -1, where data is not equal to 0, and 1 - where it is.
 
-    [plt.plot(time, feature, alpha = 0.8) for feature in y_feature]
-    plt.title(f'Time series of {", ".join(y)} by {step}')
-    plt.xlabel(step)
-    plt.xticks(rotation=90)
-    
-    if len(y) > 1:
-        plt.legend(y)
-        plt.ylabel('y')
-    else:
-        plt.ylabel(", ".join(y))
-
-    plt.show()
-    
-    
-def subplot_boxplots(dataframe, columns):
-    rows = ceil(len(columns) / 3)
-    fig, ax = plt.subplots(rows, 3)
-    fig.set_figheight(30)
-    fig.set_figwidth(30)
-    for row in range(rows):
-        for col in range(3):
-            try:
-                ax[row, col].boxplot(dataframe[columns[col + row * 3]], showmeans = True, meanline=True)
-                ax[row, col].set_title(f'Boxplot for {columns[col + row * 3]}')
-            except IndexError:
-                break
-    plt.show()
+    :param data: numpy array
+    :return: DataFrame with encoded data
+    """
+    encoded_data = np.where(data != 0, -1, 1)
+    return pd.DataFrame(encoded_data)
 
 
+def encoding_sensor_record(data):
+    """
+    Encode with 1, where data is not equal to 0, and 0 - where it is.
 
-# DATA EXAMINATION
-
-def get_extreme_values(dataframe, columns: list):
-    wiskers = {}
-    for column in columns:
-        interquartile_range = dataframe[column].describe()['75%'] - dataframe[column].describe()['25%']
-        upper_wisker = dataframe[column].describe()['75%'] + 1.5 * interquartile_range
-        lower_wisker = dataframe[column].describe()['25%'] - 1.5 * interquartile_range
-        wiskers[column] = [upper_wisker, lower_wisker]
-    return wiskers
+    :param data: numpy array
+    :return: DataFrame with encoded data
+    """
+    encoded_data = np.where(data != 0, 1, 0)
+    return pd.DataFrame(encoded_data)
 
 
-def set_extreme_threshold(wiskers: dict, threshold: dict):
-    for attribute in threshold:
-        if 'lower' in threshold[attribute]:
-            wiskers[attribute][1] = threshold[attribute]['lower']
-        elif 'upper' in threshold[attribute]:
-            wiskers[attribute][0] = threshold[attribute]['upper']
-    return wiskers
+def temperature_difference_module(data):
+    """
+    Calculates difference between the last element(ambient temperature) of data and
+    the rest of the data.
+
+    :param data: numpy array with last column - ambient temperature
+    :return DataFrame with recalculated values
+    """
+    ambient_temp = data[:, -1]
+    result = {}
+    for idx in range(len(data[0]) - 1):
+        module_temp = data[:, idx]
+        transformed_module_temp = module_temp - ambient_temp
+        result[f'transformed_module{idx}_temp'] = transformed_module_temp
+    return pd.DataFrame.from_dict(result)
 
 
-def get_outlier_index(dataframe, columns: list, wiskers: dict, outlier_indexes=None, directions={}):
-    """If directions=None both values below lower wisker and above upper wisker will be considered outliers."""
-    if not outlier_indexes:
-        outlier_indexes = set()
-    for column in columns:
-        upper_wisker, lower_wisker = wiskers[column]
-        if column in directions and directions[column] == 'upper':
-            outlier_index = dataframe[dataframe[column] > upper_wisker].index
-        elif column in directions and directions[column] == 'lower':
-            outlier_index = dataframe[dataframe[column] < lower_wisker].index
-        elif column not in directions:
-            outlier_index = dataframe[(dataframe[column] < lower_wisker) | (dataframe[column] > upper_wisker)].index
-        outlier_indexes.update(outlier_index)
-    return outlier_indexes
+def temperature_difference_inverter(data):
+    """
+    Calculates difference between the last element(ambient temperature) of data and
+    the rest of the data. Returns the resulting temperature difference and the ambient 
+    temperature
+
+    :param data: numpy array with last column - ambient temperature
+    :return DataFrame with the ambient temperature and inverters' temperature differences
+    """
+    ambient_temp = data[:, -1]
+    result = {'ambient_temp': ambient_temp}
+    for idx in range(len(data[0]) - 1):
+        inverter_temp = data[:, idx]
+        transformed_inverter_temp = inverter_temp - ambient_temp
+        result[f'transformed_inv{idx}_temp'] = transformed_inverter_temp
+    return pd.DataFrame.from_dict(result)
