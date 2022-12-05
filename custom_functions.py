@@ -107,3 +107,28 @@ def temperature_difference_inverter(data):
         transformed_inverter_temp = inverter_temp - ambient_temp
         result[f'transformed_inv{idx}_temp'] = transformed_inverter_temp
     return pd.DataFrame.from_dict(result)
+
+
+# plots
+
+def subplot_boxplots(dataframe, columns, system_id=None):
+    """
+    Plot multiple boxplots. 
+    
+    :param dataframe: data
+    :param columns: features to plot 
+    """
+    rows = int(len(columns) / 3)
+    fig, ax = plt.subplots(rows, 3)
+    if system_id:
+        fig.suptitle(f'System {system_id} boxplots')
+    fig.set_figheight(30)
+    fig.set_figwidth(30)
+    for row in range(rows):
+        for col in range(3):
+            try:
+                ax[row, col].boxplot(dataframe[columns[col + row * 3]].dropna())
+                ax[row, col].set_title(f'Boxplot for {columns[col + row * 3]}')
+            except IndexError:
+                break
+    plt.show()
