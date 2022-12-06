@@ -111,6 +111,7 @@ def temperature_difference_inverter(data):
 
 # plots
 
+
 def subplot_boxplots(dataframe, columns, system_id=None):
     """
     Plot multiple boxplots. 
@@ -132,3 +133,34 @@ def subplot_boxplots(dataframe, columns, system_id=None):
             except IndexError:
                 break
     plt.show()
+
+    
+def plot_day(data, day, features: list, ax=None):
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x)   
+    time = data['timestamp'][data['timestamp'].dt.date == day]
+    y = [data[feature][data['timestamp'].dt.date == day] for feature in features]
+    [ax.plot(time, feature) for feature in y]
+    ax.tick_params(
+        axis='x',         
+        which='both',      
+        bottom=False,      
+        top=False,         
+        labelbottom=False)    
+    ax.set_xticks(time, rotation = 90)
+    ax.set_xlabel('time')
+    ax.set_ylabel(", ".join(features))
+    return(ax)
+
+
+def plot_year(data, years: list, feature, ax=None):
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x)   
+    time = list(range(1, 13))
+    y = [data[feature][data['timestamp'].dt.year == year].groupby(data['timestamp'].dt.month).mean() for year in years]
+    [ax.plot(time, feature) for feature in y]
+    ax.set_xlabel('time')
+    ax.set_ylabel(feature)
+    return(ax)
