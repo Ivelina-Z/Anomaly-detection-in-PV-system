@@ -109,6 +109,63 @@ def temperature_difference_inverter(data):
     return pd.DataFrame.from_dict(result)
 
 
+# Label anomalies
+
+def get_whiskers_values(data):
+    """
+    data: array
+    """
+    whiskers = {}
+    for column in range(len(data[0])):
+        interquartile_range = np.quantile(data[:, column], 0.75) - np.quantile(data[:, column], 0.25)
+        upper_extreme = np.quantile(data[:, column], 0.75) + 1.5 * interquartile_range
+        lower_extreme = np.quantile(data[:, column], 0.25) - 1.5 * interquartile_range
+        whiskers[column] = [upper_extreme, lower_extreme]
+    return whiskers
+
+
+def get_outlier_index(data, whiskers: dict, threshold_conditions={}):
+    outlier_indexes = set()
+    
+    for column in range(len(data[0])):
+        if column in threshold_conditions:
+            outlier_index = np.where(threshold_conditions[column])[0]
+        else: 
+            upper_whisker, lower_whisker = whiskers[column]
+            outlier_index = np.where((data[:, column] < lower_whisker) | (data[:, column] > upper_whisker))[0]
+                                     
+        outlier_indexes.update(list(outlier_index))
+    return outlier_indexes
+
+
+def labeling(data, threshold_conditions):
+    anomaly_indexes = get_outlier_index(
+        data,
+        get_whiskers_values(data),
+        threshold_conditions)
+    expected_anomaly = np.ones([len(data), ])
+    expected_anomaly[np.array(list(anomaly_indexes))] = -1
+    return expected_anomaly
+
+
+
+def threshold_conditions(data, timestamp, columns):
+    threshold_conditions = {
+             columns['ambient_temp']: (data[:, columns['ambient_temp']] < -10),
+             columns['inverter_temp_diff']: (data[:, columns['inverter_temp_diff']] < 0),
+             columns['inverter_error_code']: (data[:, columns['inverter_error_code']] == -1),
+             columns['relative_humidity_record_available']: (data[:, columns['relative_humidity_record_available']] == 0),
+             columns['wind_direction_record_available']: (data[:, columns['wind_direction_record_available']] == 0),
+             columns['wind_speed_record_available']: (data[:, columns['wind_speed_record_available']] == 0),
+             columns['ac_current']: ((data[:, columns['ac_current']] <= 0) & (data[:, columns['poa_irradiance']] >= 50)),
+             columns['ac_voltage']: ((data[:, columns['ac_voltage']] <= 0) & (data[:, columns['poa_irradiance']] >= 50)),
+             columns['dc_current']: ((data[:, columns['dc_current']] <= 0) & (data[:, columns['poa_irradiance']] >= 50)),
+             columns['dc_voltage']: ((data[:, columns['dc_voltage']] <= 0) & (data[:, columns['poa_irradiance']] >= 50)),
+             columns['poa_irradiance']: ((data[:, columns['poa_irradiance']] <= 0) & (timestamp.dt.hour >= 8) & (timestamp.dt.hour < 17))
+    }
+    return threshold_conditions
+
+
 # plots
 
 
@@ -164,3 +221,4 @@ def plot_year(data, years: list, feature, ax=None):
     ax.set_xlabel('time')
     ax.set_ylabel(feature)
     return(ax)
+
