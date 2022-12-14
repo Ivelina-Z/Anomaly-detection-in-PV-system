@@ -222,3 +222,146 @@ def plot_year(data, years: list, feature, ax=None):
     ax.set_ylabel(feature)
     return(ax)
 
+
+def plot_cv_results(cv_results: pd.DataFrame, hyperparameter, x=['mean_test_score'], std=True, ax=None):
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x)    
+    [ax.plot(cv_results[hyperparameter].unique(), cv_results.groupby(hyperparameter)[feature].mean()) for feature in x]
+    ax.set_xticks(cv_results[hyperparameter].unique())
+    ax.set_xlabel(hyperparameter)
+    ax.set_ylim(0.0, 1.1)
+    ax.set_ylabel('f2-score, anomaly class')    
+    if std:
+        [ax.fill_between(
+            cv_results[hyperparameter].unique(),
+            cv_results.groupby(hyperparameter)[feature].mean() - cv_results.groupby(hyperparameter)['std_test_score'].mean(),
+            cv_results.groupby(hyperparameter)[feature].mean() + cv_results.groupby(hyperparameter)['std_test_score'].mean(),
+            alpha=0.1
+    ) for feature in x] 
+    return(ax)
+
+
+def plot_validation_curve(train_scores, test_scores, param_range, param, std=False, ax=None):
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x)    
+    ax.set_xlabel(param)
+    ax.set_xticks(param_range)
+    ax.set_ylabel("f2 score, anomaly class")
+    ax.set_ylim(0.0, 1.1)
+    ax.plot(param_range, train_scores_mean, label="Training score", color="darkorange")
+    ax.plot(param_range, test_scores_mean, label="Cross-validation score", color="navy")
+    if std:
+        ax.fill_between(
+            param_range,
+            train_scores_mean - train_scores_std,
+            train_scores_mean + train_scores_std,
+            alpha=0.2,
+            color="darkorange"
+        )
+        
+        ax.fill_between(
+            param_range,
+            test_scores_mean - test_scores_std,
+            test_scores_mean + test_scores_std,
+            alpha=0.2,
+            color="navy"
+        )
+    return(ax)
+
+
+def plot_learning_curve_time(fit_times, train_size, std=False, ax=None):
+    fit_times_mean = np.mean(fit_times, axis=1)
+    fit_times_std = np.std(fit_times, axis=1)
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x)    
+
+    if std:
+        ax.fill_between(
+            train_size,
+            fit_times_mean - fit_times_std,
+            fit_times_mean + fit_times_std,
+            alpha=0.1,
+            color="r"
+        )
+    ax.plot(train_size, fit_times_mean, "o-", color="r")
+    ax.set_xlabel('Number of samples')
+    ax.set_ylabel('fit time')
+    return(ax)
+    
+    
+def plot_learning_curve(train_scores, test_scores, train_size, std=False, ax=None):
+    train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
+    test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
+    
+    if ax is None:
+        ax = plt.gca()
+        ax.legend(x) 
+        
+    if std:
+        ax.fill_between(
+            train_size,
+            train_scores_mean - train_scores_std,
+            train_scores_mean + train_scores_std,
+            alpha=0.1,
+            color="r"
+        )
+        ax.fill_between(
+                train_size,
+                test_scores_mean - test_scores_std,
+                test_scores_mean + test_scores_std,
+                alpha=0.1,
+                color="g"
+        )
+        
+    ax.plot(train_size, train_scores_mean, "o-", color="r", label="Training score")
+    ax.plot(train_size, test_scores_mean, "o-", color="g", label="Cross-validation score")
+    
+    ax.set_xlabel('Number of samples')
+    ax.set_xticks(train_size)
+
+    ax.set_ylabel('f2-score of the anomaly class')
+    ax.set_ylim(0.0, 1.1)
+    return(ax)
+    
+
+def plot_test_results(years, results:dict, model_contamination=0.5):
+    plt.title(f'{", ".join(results.keys())} percentage on testing data')
+    [plt.plot(years, score, label=metrics_name ) for metrics_name, score in results.items()]
+    plt.hlines(model_contamination, xmin = years[0], xmax = years[-1], linestyles = '--', color = 'red', label = 'train contamination')
+
+    plt.xticks(years)
+    plt.xlabel('year')
+
+    plt.ylabel('score/contamination')
+    plt.yticks(np.arange(0, 1.1, 0.1))
+
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
+              fancybox=True, shadow=True, ncol=5)
+    plt.show()
+
+
+def plot_confusion_matrices(conf_matrix, classes, data_contamination):
+    fig, axes = plt.subplots(1, len(conf_matrix), figsize=(20, 5))
+    for idx, result in enumerate(conf_matrix):
+        disp = ConfusionMatrixDisplay(result, display_labels=classes)
+        disp.plot(ax=axes[idx], xticks_rotation=90, cmap='Reds')
+        disp.im_.colorbar.remove()
+        disp.ax_.set_title(f'{data_contamination[idx]:.2f}% contamination')
+        if idx != 0:
+            disp.ax_.set_ylabel('')
+        if idx != len(conf_matrix) // 2:
+            disp.ax_.set_xlabel('')
+
+    plt.subplots_adjust(wspace=0.40, hspace=0.1)
+    fig.colorbar(disp.im_, ax=axes)
+    plt.show()
