@@ -1,1 +1,2 @@
 # Anomaly-detection-in-PV-system
+The data for systems 34 and 1276 used in this repository can be downloaded from the NREL's API with a request to this endpoint - (https://developer.nrel.gov/api/pvdaq/v3/data_file?api_key={key}&system_id={system}&year={year}. For a successful response, an API key should be provided. More information and an API key request form can be found [here](https://developer.nrel.gov/).  
