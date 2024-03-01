@@ -165,7 +165,23 @@ def threshold_conditions(data, timestamp, columns):
     }
     return threshold_conditions
 
+# Modelling
 
+def year_data_split(data, year, target_column=None, drop_time = True):
+    data_attributes = data[data['timestamp'].dt.year == year]    
+    labels = data_attributes[target_column]
+    data_attributes = data_attributes.drop([target_column], axis=1)
+    if drop_time:
+        data_attributes = data_attributes.drop(['timestamp'], axis=1)
+    return data_attributes, labels
+
+
+def contamination(labels, anomaly_label = -1):
+    """
+        Calculates the amount of anomalies present in the data based on the automatic annotation       
+    """
+    return np.count_nonzero(labels == anomaly_label) / len(labels)
+    
 # plots
 
 
